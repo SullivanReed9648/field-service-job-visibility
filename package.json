@@ -1,0 +1,20 @@
+{
+  "name": "field-service-job-visibility",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/field_photo_intake.ts",
+    "demo": "tsx src/field_photo_intake.ts --snapshot",
+    "test": "tsx --test test/followup_decision.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
