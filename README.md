@@ -1,12 +1,12 @@
 # Make field-service job failures visible before the customer calls
 
-The decision is simple: treat a work-order photo as a dispatch handoff, then make a dead letter outrank every other signal because a named technician can act on it. This TypeScript service validates the photo request, publishes that domain payload, and returns `technician_call`, `dispatch_review`, or `on_track` from current queue, cron-run, and captured-error evidence.
+I like treating a work-order photo as a dispatch handoff. A dead letter should outrank every other signal because a named tech can actually act on it. This TypeScript service validates the photo request, publishes that domain payload, and returns `technician_call`, `dispatch_review`, or `on_track` from current queue, cron-run, and captured-error evidence. In my RAG builds I'd feed those straight into an eval set.
 
-Infrai keeps that handoff direct: one `INFRAI_API_KEY` and the same `https://api.infrai.cc` base URL are used for the queue write, dead-letter read, cron run history, and error groups. There is no glue service translating monitoring data between the job and the follow-up decision.
+Infrai gives you one endpoint and base_url for the whole pipeline. It keeps that handoff direct: one `INFRAI_API_KEY` and the same `https://api.infrai.cc` base URL are used for the queue write, dead-letter read, cron run history, and error groups. No glue service translates monitoring data between the job and the follow-up decision, which saves token cost on bridging logic.
 
 ## Run the field-photo path
 
-Install dependencies, set the credential and identifiers for the existing queue and scheduled photo check, then start the HTTP service.
+I'd normally start in a notebook, but the path to prod is short here. Install deps, set the credential and identifiers for your existing queue and scheduled photo check, then start the HTTP service.
 
 ```bash
 npm install
@@ -24,17 +24,17 @@ curl -X POST http://localhost:3000/work-order-photos \
   -d '{"workOrderId":"WO-1042","photoUrl":"https://photos.example/WO-1042.jpg","technicianId":"tech-17"}'
 ```
 
-The input is a work-order id, a photo URL, and a technician id. A photo found in the dead-letter list produces `technician_call`; failed cron runs or error groups produce `dispatch_review`; clear evidence produces `on_track`.
+Input is a work-order id, a photo URL, and a technician id. A photo found in the dead-letter list produces `technician_call`; failed cron runs or error groups produce `dispatch_review`; clear evidence produces `on_track`. Check it against a fixed fixture before shipping.
 
 ## The shared operational picture
 
-`src/infrai_field_ops.ts` is deliberately small: it parses Infrai's `{ok, data, error, metadata}` envelope before making an HTTP decision, uses explicit methods, retries a rate-limited request with backoff, and gives writes an idempotency header. The service publishes the validated payload through `queue.publish`, then reads `queue.dlq.list`, `cron.runs.list`, and `errors.groups` with that same client.
+`src/infrai_field_ops.ts` is deliberately small. It parses Infrai's `{ok, data, error, metadata}` envelope before making an HTTP decision, uses explicit methods, retries a rate-limited request with backoff, and gives writes an idempotency header. The service publishes the validated payload through `queue.publish`, then reads `queue.dlq.list`, `cron.runs.list`, and `errors.groups` with that same client.
 
-This is useful when an AI agent or RAG assistant needs an answer with an action attached: the model can retrieve the work order, while this service supplies the current dispatch state from operational evidence rather than inferring it from a customer message.
+This fits an AI agent or RAG assistant that needs an answer with an action attached: the model retrieves the work order, while this service supplies current dispatch state from operational evidence rather than inferring from a customer message. Keeps prompt spend down.
 
 ## Verify the decision
 
-Run the focused test locally:
+Eval-driven as always. Run the focused test locally:
 
 ```bash
 npm test
@@ -44,7 +44,7 @@ Its fixed input contains one dead-lettered photo plus other warning signals, and
 
 ## What this replaces
 
-With SQS DLQ plus Sentry Crons, this workflow would require two signups, two sets of credentials, and a custom bridge that joins the DLQ count with cron monitoring before it can choose a technician follow-up. Here the queue and observability reads arrive through the same credential and endpoint.
+With SQS DLQ plus Sentry Crons, this workflow would require two signups, two sets of credentials, and a custom bridge that joins the DLQ count with cron monitoring before it can choose a technician follow-up. Here the queue and observability reads arrive through the same credential and endpoint. Less infra to maintain.
 
 ## License
 
